@@ -43,6 +43,13 @@ st.markdown("""
     .sidebar .sidebar-content {
         background-color: #f8f9fa;
     }
+    .upload-section {
+        background-color: #e8f4fd;
+        padding: 1.5rem;
+        border-radius: 0.5rem;
+        border: 2px dashed #1f77b4;
+        margin-bottom: 2rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -58,42 +65,99 @@ class SistemaControleEstoque:
             st.session_state.divergencias = []
         if 'contagens_ciclicas' not in st.session_state:
             st.session_state.contagens_ciclicas = []
-        if 'sistema_inicializado' not in st.session_state:
-            st.session_state.sistema_inicializado = False
+        if 'dados_carregados' not in st.session_state:
+            st.session_state.dados_carregados = False
 
-    def inicializar_estoque_demo(self):
-        if st.session_state.sistema_inicializado:
-            return
+    def carregar_planilha_sistema(self, arquivo_excel):
+        """Carrega dados do estoque do sistema a partir de planilha Excel"""
+        try:
+            df = pd.read_excel(arquivo_excel)
             
-        produtos = {
-            'A001': {'nome': 'Smartphone Galaxy', 'categoria': 'Eletrônicos', 'valor_unit': 1200.00},
-            'A002': {'nome': 'Notebook Dell', 'categoria': 'Informática', 'valor_unit': 2500.00},
-            'A003': {'nome': 'Tênis Nike', 'categoria': 'Calçados', 'valor_unit': 350.00},
-            'A004': {'nome': 'Camisa Polo', 'categoria': 'Roupas', 'valor_unit': 89.90},
-            'A005': {'nome': 'Perfume Importado', 'categoria': 'Cosméticos', 'valor_unit': 180.00},
-            'A006': {'nome': 'Smart TV 55"', 'categoria': 'Eletrônicos', 'valor_unit': 2200.00},
-            'A007': {'nome': 'Cafeteira Expresso', 'categoria': 'Eletrodomésticos', 'valor_unit': 450.00},
-            'A008': {'nome': 'Livro Técnico', 'categoria': 'Livros', 'valor_unit': 65.00},
-            'A009': {'nome': 'Mouse Gaming', 'categoria': 'Informática', 'valor_unit': 120.00},
-            'A010': {'nome': 'Headphone Bluetooth', 'categoria': 'Eletrônicos', 'valor_unit': 280.00}
-        }
-        
-        for codigo, info in produtos.items():
-            qtd_sistema = random.randint(50, 200)
-            st.session_state.estoque_sistema[codigo] = {
-                'quantidade': qtd_sistema,
-                'nome': info['nome'],
-                'categoria': info['categoria'],
-                'valor_unitario': info['valor_unit'],
-                'ultima_contagem': datetime.now() - timedelta(days=random.randint(1, 30))
-            }
+            # Validar colunas obrigatórias
+            colunas_obrigatorias = ['codigo', 'nome', 'categoria', 'quantidade', 'valor_unitario']
+            colunas_faltantes = [col for col in colunas_obrigatorias if col not in df.columns]
             
-            divergencia = random.randint(-10, 15)
-            st.session_state.estoque_fisico[codigo] = qtd_sistema + divergencia
+            if colunas_faltantes:
+                st.error(f"Colunas obrigatórias faltando: {', '.join(colunas_faltantes)}")
+                st.info("Colunas obrigatórias: codigo, nome, categoria, quantidade, valor_unitario")
+                return False
+            
+            # Limpar dados existentes
+            st.session_state.estoque_sistema = {}
+            
+            # Carregar dados
+            for _, row in df.iterrows():
+                codigo = str(row['codigo']).strip()
+                st.session_state.estoque_sistema[codigo] = {
+                    'quantidade': int(row['quantidade']),
+                    'nome': str(row['nome']).strip(),
+                    'categoria': str(row['categoria']).strip(),
+                    'valor_unitario': float(row['valor_unitario']),
+                    'ultima_contagem': datetime.now() - timedelta(days=random.randint(1, 30))
+                }
+            
+            st.success(f"✅ Dados do sistema carregados: {len(st.session_state.estoque_sistema)} produtos")
+            return True
+            
+        except Exception as e:
+            st.error(f"Erro ao carregar planilha do sistema: {str(e)}")
+            return False
+
+    def carregar_planilha_fisico(self, arquivo_excel):
+        """Carrega dados do estoque físico a partir de planilha Excel"""
+        try:
+            df = pd.read_excel(arquivo_excel)
+            
+            # Validar colunas obrigatórias
+            colunas_obrigatorias = ['codigo', 'quantidade_fisica']
+            colunas_faltantes = [col for col in colunas_obrigatorias if col not in df.columns]
+            
+            if colunas_faltantes:
+                st.error(f"Colunas obrigatórias faltando: {', '.join(colunas_faltantes)}")
+                st.info("Colunas obrigatórias: codigo, quantidade_fisica")
+                return False
+            
+            # Limpar dados existentes
+            st.session_state.estoque_fisico = {}
+            
+            # Carregar dados
+            for _, row in df.iterrows():
+                codigo = str(row['codigo']).strip()
+                if codigo in st.session_state.estoque_sistema:
+                    st.session_state.estoque_fisico[codigo] = int(row['quantidade_fisica'])
+                else:
+                    st.warning(f"Produto {codigo} não encontrado no estoque do sistema")
+            
+            st.success(f"✅ Dados físicos carregados: {len(st.session_state.estoque_fisico)} produtos")
+            return True
+            
+        except Exception as e:
+            st.error(f"Erro ao carregar planilha física: {str(e)}")
+            return False
+
+    def gerar_modelo_excel(self):
+        """Gera modelos de planilhas Excel para download"""
+        # Modelo para estoque do sistema
+        modelo_sistema = pd.DataFrame({
+            'codigo': ['A001', 'A002', 'A003', 'A004', 'A005'],
+            'nome': ['Smartphone Galaxy', 'Notebook Dell', 'Tênis Nike', 'Camisa Polo', 'Perfume Importado'],
+            'categoria': ['Eletrônicos', 'Informática', 'Calçados', 'Roupas', 'Cosméticos'],
+            'quantidade': [150, 75, 200, 300, 80],
+            'valor_unitario': [1200.00, 2500.00, 350.00, 89.90, 180.00]
+        })
         
-        st.session_state.sistema_inicializado = True
+        # Modelo para estoque físico
+        modelo_fisico = pd.DataFrame({
+            'codigo': ['A001', 'A002', 'A003', 'A004', 'A005'],
+            'quantidade_fisica': [145, 75, 195, 302, 78]
+        })
+        
+        return modelo_sistema, modelo_fisico
 
     def realizar_contagem_ciclica(self, codigo: str) -> Dict:
+        if codigo not in st.session_state.estoque_sistema or codigo not in st.session_state.estoque_fisico:
+            return {"erro": "Produto não encontrado em ambos os estoques"}
+        
         timestamp = datetime.now()
         qtd_sistema = st.session_state.estoque_sistema[codigo]['quantidade']
         qtd_fisica = st.session_state.estoque_fisico[codigo]
@@ -189,7 +253,6 @@ def criar_grafico_evolucao():
             marker=dict(size=6)
         ))
     
-
     fig.add_hline(y=95, line_dash="dash", line_color="red", 
                   annotation_text="Meta: 95%")
     
@@ -265,9 +328,17 @@ def criar_grafico_roi():
     return fig
 
 def criar_grafico_divergencias():
-    """Cria gráfico de divergências por categoria"""
-    categorias = ['Eletrônicos', 'Informática', 'Eletrodomésticos', 'Roupas', 'Calçados', 'Cosméticos']
-    valores = [18500, 12300, 8700, 4200, 3800, 2500]
+    """Cria gráfico de divergências por categoria baseado nos dados carregados"""
+    if not st.session_state.divergencias:
+        # Dados de exemplo se não há divergências
+        categorias = ['Eletrônicos', 'Informática', 'Eletrodomésticos', 'Roupas', 'Calçados', 'Cosméticos']
+        valores = [18500, 12300, 8700, 4200, 3800, 2500]
+    else:
+        # Usar dados reais das divergências
+        df_div = pd.DataFrame(st.session_state.divergencias)
+        divergencias_categoria = df_div.groupby('categoria')['valor_divergencia'].sum()
+        categorias = divergencias_categoria.index.tolist()
+        valores = divergencias_categoria.values.tolist()
     
     fig = go.Figure(data=[go.Pie(
         labels=categorias, 
@@ -278,7 +349,7 @@ def criar_grafico_divergencias():
     )])
     
     fig.update_layout(
-        title="🏷️ Divergências por Categoria (R$)",
+        title="Divergências por Categoria (R$)",
         height=500
     )
     
@@ -289,14 +360,65 @@ def main():
     
     st.markdown('<h1 class="main-header">Sistema de Controle de Acuracidade de Estoque</h1>', 
                 unsafe_allow_html=True)
-    sistema = SistemaControleEstoque()
-    sistema.inicializar_estoque_demo()
     
+    sistema = SistemaControleEstoque()
+    
+    # Seção de Upload de Planilhas
+    st.markdown('<div class="upload-section">', unsafe_allow_html=True)
+    st.subheader("📁 Carregamento de Dados")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.write("**1. Estoque do Sistema**")
+        st.write("Colunas: codigo, nome, categoria, quantidade, valor_unitario")
+        arquivo_sistema = st.file_uploader(
+            "Carregar planilha do estoque do sistema",
+            type=['xlsx', 'xls'],
+            key="sistema"
+        )
+        
+        if arquivo_sistema:
+            if sistema.carregar_planilha_sistema(arquivo_sistema):
+                st.session_state.dados_carregados = True
+    
+    with col2:
+        st.write("**2. Estoque Físico (Contagem)**")
+        st.write("Colunas: codigo, quantidade_fisica")
+        arquivo_fisico = st.file_uploader(
+            "Carregar planilha do estoque físico",
+            type=['xlsx', 'xls'],
+            key="fisico"
+        )
+        
+        if arquivo_fisico and st.session_state.estoque_sistema:
+            sistema.carregar_planilha_fisico(arquivo_fisico)
+    
+
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Verificar se os dados foram carregados
+    if not st.session_state.estoque_sistema:
+        st.warning("⚠️ Por favor, carregue primeiro a planilha do estoque do sistema para continuar.")
+        return
+    
+    if not st.session_state.estoque_fisico:
+        st.warning("⚠️ Por favor, carregue a planilha do estoque físico para realizar as contagens.")
+        return
+    
+    # Sidebar com controles
     st.sidebar.header("🔧 Controles do Sistema")
     
     st.sidebar.subheader("Realizar Contagens")
     
-    produtos_disponiveis = list(st.session_state.estoque_sistema.keys())
+    produtos_disponiveis = list(set(st.session_state.estoque_sistema.keys()) & 
+                               set(st.session_state.estoque_fisico.keys()))
+    
+    if not produtos_disponiveis:
+        st.sidebar.error("Nenhum produto comum encontrado entre as planilhas")
+        return
+    
     produto_selecionado = st.sidebar.selectbox(
         "Selecione um produto:",
         produtos_disponiveis,
@@ -305,10 +427,12 @@ def main():
     
     if st.sidebar.button("Realizar Contagem"):
         with st.spinner("Realizando contagem..."):
-            time.sleep(1)  # Simular processamento
+            time.sleep(1)
             resultado = sistema.realizar_contagem_ciclica(produto_selecionado)
             
-            if resultado['status'] == 'OK':
+            if 'erro' in resultado:
+                st.sidebar.error(resultado['erro'])
+            elif resultado['status'] == 'OK':
                 st.sidebar.success(f"Contagem OK: {resultado['nome']}")
             else:
                 st.sidebar.error(f"Divergência: {resultado['nome']}")
@@ -319,23 +443,29 @@ def main():
         with st.spinner("Realizando múltiplas contagens..."):
             progress_bar = st.sidebar.progress(0)
             for i, codigo in enumerate(produtos_disponiveis):
-                sistema.realizar_contagem_ciclica(codigo)
-                progress_bar.progress((i + 1) / len(produtos_disponiveis))
+                resultado = sistema.realizar_contagem_ciclica(codigo)
+                if 'erro' not in resultado:
+                    progress_bar.progress((i + 1) / len(produtos_disponiveis))
                 time.sleep(0.2)
             st.sidebar.success("Todas as contagens realizadas!")
     
-    if st.sidebar.button("Reset Sistema"):
-        for key in ['estoque_sistema', 'estoque_fisico', 'movimentacoes', 
-                   'divergencias', 'contagens_ciclicas', 'sistema_inicializado']:
-            if key in st.session_state:
-                del st.session_state[key]
-        st.experimental_rerun()
-
+    if st.sidebar.button("Reset Contagens"):
+        st.session_state.movimentacoes = []
+        st.session_state.divergencias = []
+        st.session_state.contagens_ciclicas = []
+        st.sidebar.success("Contagens resetadas!")
+    
+    # Exibir informações dos dados carregados
+    st.sidebar.subheader("📊 Dados Carregados")
+    st.sidebar.write(f"Produtos sistema: {len(st.session_state.estoque_sistema)}")
+    st.sidebar.write(f"Produtos físico: {len(st.session_state.estoque_fisico)}")
+    st.sidebar.write(f"Produtos válidos: {len(produtos_disponiveis)}")
+    
+    # KPIs Principais
     metricas = sistema.calcular_acuracidade()
     
-
     if 'erro' not in metricas:
-        st.subheader("KPIs Principais")
+        st.subheader("📈 KPIs Principais")
         
         col1, col2, col3, col4 = st.columns(4)
         
@@ -366,6 +496,7 @@ def main():
                      delta=f"+{produtividade - 60}% vs atual")
             st.markdown('</div>', unsafe_allow_html=True)
     
+    # Tabs com análises
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "Evolução", "Comparativo", "ROI", "Categorias", "Dados"
     ])
@@ -416,12 +547,34 @@ def main():
         fig_divergencias = criar_grafico_divergencias()
         st.plotly_chart(fig_divergencias, use_container_width=True)
         
-        st.warning("Análise: Eletrônicos e Informática representam 62% das divergências. "
-                  "Priorizar controles nessas categorias.")
+        if st.session_state.divergencias:
+            st.info("Análise baseada nos dados carregados e contagens realizadas.")
+        else:
+            st.warning("Realize algumas contagens para ver a análise real das divergências.")
     
     with tab5:
         st.subheader("Dados Detalhados")
         
+        # Mostrar resumo dos dados carregados
+        st.write("**Resumo dos Dados Carregados:**")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.session_state.estoque_sistema:
+                df_sistema = pd.DataFrame.from_dict(st.session_state.estoque_sistema, orient='index')
+                df_sistema.reset_index(inplace=True)
+                df_sistema.rename(columns={'index': 'codigo'}, inplace=True)
+                st.write("**Estoque do Sistema:**")
+                st.dataframe(df_sistema[['codigo', 'nome', 'categoria', 'quantidade', 'valor_unitario']], use_container_width=True)
+        
+        with col2:
+            if st.session_state.estoque_fisico:
+                df_fisico = pd.DataFrame(list(st.session_state.estoque_fisico.items()), 
+                                       columns=['codigo', 'quantidade_fisica'])
+                st.write("**Estoque Físico:**")
+                st.dataframe(df_fisico, use_container_width=True)
+        
+        # Mostrar contagens realizadas
         if st.session_state.contagens_ciclicas:
             df_contagens = pd.DataFrame(st.session_state.contagens_ciclicas)
             df_contagens['timestamp'] = pd.to_datetime(df_contagens['timestamp'])
@@ -429,7 +582,7 @@ def main():
             st.write("**Últimas Contagens Realizadas:**")
             st.dataframe(
                 df_contagens[['timestamp', 'codigo', 'nome', 'categoria', 'qtd_sistema', 
-                             'qtd_fisica', 'divergencia', 'valor_divergencia', 'status']].tail(10),
+                             'qtd_fisica', 'divergencia', 'valor_divergencia', 'status']],
                 use_container_width=True
             )
             
