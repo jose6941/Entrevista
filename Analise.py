@@ -9,15 +9,12 @@ import random
 from typing import Dict, List
 import time
 
-# ==================== CONFIGURAÇÃO DA PÁGINA ====================
 st.set_page_config(
     page_title="Sistema de Controle de Acuracidade",
-    page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# ==================== ESTILOS CSS ====================
 st.markdown("""
 <style>
     .main-header {
@@ -49,16 +46,12 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ==================== CLASSE PRINCIPAL ====================
 class SistemaControleEstoque:
-    """Sistema de controle de acuracidade de estoque"""
     
     def __init__(self):
-        """Inicializa o sistema e session states"""
         self._inicializar_session_states()
 
     def _inicializar_session_states(self):
-        """Inicializa todas as variáveis de sessão"""
         session_vars = {
             'estoque_sistema': {},
             'estoque_fisico': {},
@@ -71,29 +64,17 @@ class SistemaControleEstoque:
         for var, default_value in session_vars.items():
             if var not in st.session_state:
                 st.session_state[var] = default_value
-
-    # ==================== MÉTODOS DE CARREGAMENTO ====================
     
     def carregar_planilha_sistema(self, arquivo_excel) -> bool:
-        """
-        Carrega dados do estoque do sistema
-        
-        Args:
-            arquivo_excel: Arquivo Excel uploadado
-            
-        Returns:
-            bool: True se carregado com sucesso
-        """
+
         colunas_obrigatorias = ['codigo', 'nome', 'categoria', 'quantidade', 'valor_unitario']
         
         try:
             df = pd.read_excel(arquivo_excel)
             
-            # Validar colunas
             if not self._validar_colunas(df, colunas_obrigatorias):
                 return False
             
-            # Limpar e carregar dados
             st.session_state.estoque_sistema = {}
             
             for _, row in df.iterrows():
@@ -106,7 +87,7 @@ class SistemaControleEstoque:
                     'ultima_contagem': datetime.now() - timedelta(days=random.randint(1, 30))
                 }
             
-            st.success(f"✅ Dados do sistema carregados: {len(st.session_state.estoque_sistema)} produtos")
+            st.success(f"Dados do sistema carregados: {len(st.session_state.estoque_sistema)} produtos")
             return True
             
         except Exception as e:
@@ -114,25 +95,15 @@ class SistemaControleEstoque:
             return False
 
     def carregar_planilha_fisico(self, arquivo_excel) -> bool:
-        """
-        Carrega dados do estoque físico
-        
-        Args:
-            arquivo_excel: Arquivo Excel uploadado
-            
-        Returns:
-            bool: True se carregado com sucesso
-        """
+    
         colunas_obrigatorias = ['codigo', 'quantidade_fisica']
         
         try:
             df = pd.read_excel(arquivo_excel)
-            
-            # Validar colunas
+
             if not self._validar_colunas(df, colunas_obrigatorias):
                 return False
             
-            # Limpar e carregar dados
             st.session_state.estoque_fisico = {}
             produtos_nao_encontrados = []
             
@@ -146,7 +117,7 @@ class SistemaControleEstoque:
             if produtos_nao_encontrados:
                 st.warning(f"Produtos não encontrados no sistema: {', '.join(produtos_nao_encontrados[:5])}")
             
-            st.success(f"✅ Dados físicos carregados: {len(st.session_state.estoque_fisico)} produtos")
+            st.success(f"Dados físicos carregados: {len(st.session_state.estoque_fisico)} produtos")
             return True
             
         except Exception as e:
@@ -154,7 +125,7 @@ class SistemaControleEstoque:
             return False
 
     def _validar_colunas(self, df: pd.DataFrame, colunas_obrigatorias: List[str]) -> bool:
-        """Valida se todas as colunas obrigatórias estão presentes"""
+
         colunas_faltantes = [col for col in colunas_obrigatorias if col not in df.columns]
         
         if colunas_faltantes:
@@ -163,11 +134,9 @@ class SistemaControleEstoque:
             return False
         
         return True
-
-    # ==================== MÉTODOS DE CÁLCULO ====================
     
     def calcular_acuracidade_inicial(self) -> float:
-        """Calcula a acuracidade inicial baseada nos dados carregados"""
+
         if not st.session_state.estoque_sistema or not st.session_state.estoque_fisico:
             return 78.0
         
@@ -182,7 +151,7 @@ class SistemaControleEstoque:
         return (produtos_ok / len(produtos_comuns)) * 100
 
     def calcular_economia_projetada(self) -> float:
-        """Calcula economia mensal baseada nas divergências encontradas"""
+
         if not st.session_state.estoque_sistema or not st.session_state.estoque_fisico:
             return 36700
         
@@ -196,12 +165,11 @@ class SistemaControleEstoque:
             valor_unitario = st.session_state.estoque_sistema[codigo]['valor_unitario']
             valor_total_divergencias += divergencia * valor_unitario
         
-        # Economia mensal = 80% das divergências encontradas
         economia_mensal = valor_total_divergencias * 0.8
         return max(economia_mensal, 5000)
 
     def obter_produtos_divergentes(self) -> List[Dict]:
-        """Retorna lista detalhada de produtos com divergências"""
+
         if not st.session_state.estoque_sistema or not st.session_state.estoque_fisico:
             return []
         
@@ -231,13 +199,12 @@ class SistemaControleEstoque:
         return sorted(produtos_divergentes, key=lambda x: abs(x['valor_divergencia']), reverse=True)
 
     def _obter_produtos_comuns(self) -> set:
-        """Retorna produtos presentes em ambos os estoques"""
+
         return set(st.session_state.estoque_sistema.keys()) & set(st.session_state.estoque_fisico.keys())
 
-    # ==================== MÉTODOS DE CONTAGEM ====================
     
     def realizar_contagem_ciclica(self, codigo: str) -> Dict:
-        """Realiza contagem cíclica de um produto específico"""
+
         if codigo not in st.session_state.estoque_sistema or codigo not in st.session_state.estoque_fisico:
             return {"erro": "Produto não encontrado em ambos os estoques"}
         
@@ -266,7 +233,7 @@ class SistemaControleEstoque:
         return contagem
 
     def calcular_acuracidade(self) -> Dict:
-        """Calcula métricas de acuracidade baseadas nas contagens realizadas"""
+
         if not st.session_state.contagens_ciclicas:
             return {"erro": "Nenhuma contagem realizada"}
         
@@ -291,14 +258,12 @@ class SistemaControleEstoque:
             'valor_total_estoque': valor_total_estoque
         }
 
-    # ==================== MÉTODOS DE SIMULAÇÃO ====================
     
     def gerar_dados_simulacao(self, dias: int = 30) -> pd.DataFrame:
-        """Gera dados de simulação da evolução da acuracidade"""
+
         acuracidade_inicial = self.calcular_acuracidade_inicial()
         resultados = []
         
-        # Definir meta final baseada na situação atual
         if acuracidade_inicial >= 90:
             meta_final = min(98, acuracidade_inicial + 5)
         elif acuracidade_inicial >= 80:
@@ -309,22 +274,21 @@ class SistemaControleEstoque:
         for dia in range(dias + 1):
             if dia == 0:
                 acuracidade = acuracidade_inicial
-            elif dia <= 10:  # Implementação
+            elif dia <= 10:  
                 progresso = dia / 10
                 melhoria = (meta_final - acuracidade_inicial) * 0.4 * progresso
                 acuracidade = acuracidade_inicial + melhoria
-            elif dia <= 20:  # Estabilização
+            elif dia <= 20: 
                 progresso = (dia - 10) / 10
                 melhoria_base = (meta_final - acuracidade_inicial) * 0.4
                 melhoria_adicional = (meta_final - acuracidade_inicial) * 0.4 * progresso
                 acuracidade = acuracidade_inicial + melhoria_base + melhoria_adicional
-            else:  # Otimização
+            else:  
                 progresso = (dia - 20) / 10
                 melhoria_base = (meta_final - acuracidade_inicial) * 0.8
                 melhoria_final = (meta_final - acuracidade_inicial) * 0.2 * progresso
                 acuracidade = acuracidade_inicial + melhoria_base + melhoria_final
             
-            # Adicionar variação aleatória
             acuracidade += random.uniform(-0.5, 0.5)
             acuracidade = max(acuracidade_inicial - 2, min(meta_final + 1, acuracidade))
             
@@ -338,10 +302,8 @@ class SistemaControleEstoque:
         
         return pd.DataFrame(resultados)
 
-# ==================== FUNÇÕES DE GRÁFICOS ====================
-
 def criar_grafico_evolucao() -> go.Figure:
-    """Cria gráfico de evolução da acuracidade"""
+
     sistema = SistemaControleEstoque()
     dados = sistema.gerar_dados_simulacao(30)
     acuracidade_inicial = sistema.calcular_acuracidade_inicial()
@@ -375,12 +337,11 @@ def criar_grafico_evolucao() -> go.Figure:
     return fig
 
 def criar_grafico_comparativo() -> go.Figure:
-    """Cria gráfico comparativo antes vs depois"""
+
     sistema = SistemaControleEstoque()
     acuracidade_inicial = sistema.calcular_acuracidade_inicial()
     acuracidade_final = min(95.8, acuracidade_inicial + 15)
     
-    # Calcular métricas baseadas nos dados reais
     produtos_divergentes = sistema.obter_produtos_divergentes()
     perdas_atuais = sum([p['valor_divergencia'] for p in produtos_divergentes]) / 1000
     perdas_futuras = perdas_atuais * 0.15
@@ -409,7 +370,7 @@ def criar_grafico_comparativo() -> go.Figure:
     return fig
 
 def criar_grafico_roi() -> go.Figure:
-    """Cria gráfico de ROI e payback"""
+
     sistema = SistemaControleEstoque()
     economia_mensal = sistema.calcular_economia_projetada()
     
@@ -433,7 +394,6 @@ def criar_grafico_roi() -> go.Figure:
     
     fig.add_hline(y=0, line_dash="dash", line_color="black")
     
-    # Calcular payback
     payback_mes = next((i for i, v in enumerate(fluxo_caixa) if v >= 0), 12)
     if payback_mes < 12:
         fig.add_trace(go.Scatter(
@@ -454,13 +414,13 @@ def criar_grafico_roi() -> go.Figure:
     return fig
 
 def criar_grafico_divergencias() -> go.Figure:
-    """Cria gráfico de divergências por categoria"""
+
     if not st.session_state.divergencias:
-        # Dados de exemplo se não há divergências
+   
         categorias = ['Eletrônicos', 'Informática', 'Eletrodomésticos', 'Roupas', 'Calçados', 'Cosméticos']
         valores = [18500, 12300, 8700, 4200, 3800, 2500]
     else:
-        # Usar dados reais das divergências
+
         df_div = pd.DataFrame(st.session_state.divergencias)
         divergencias_categoria = df_div.groupby('categoria')['valor_divergencia'].sum()
         categorias = divergencias_categoria.index.tolist()
@@ -481,18 +441,16 @@ def criar_grafico_divergencias() -> go.Figure:
     
     return fig
 
-# ==================== FUNÇÕES DE INTERFACE ====================
-
 def exibir_upload_section():
-    """Exibe seção de upload de planilhas"""
+
     st.markdown('<div class="upload-section">', unsafe_allow_html=True)
-    st.subheader("📁 Carregamento de Dados")
+    st.subheader("Carregamento de Dados")
     
     col1, col2 = st.columns(2)
     sistema = SistemaControleEstoque()
     
     with col1:
-        st.write("**1. Estoque do Sistema**")
+        st.write("1. Estoque do Sistema")
         st.write("Colunas: codigo, nome, categoria, quantidade, valor_unitario")
         arquivo_sistema = st.file_uploader(
             "Carregar planilha do estoque do sistema",
@@ -505,7 +463,7 @@ def exibir_upload_section():
                 st.session_state.dados_carregados = True
     
     with col2:
-        st.write("**2. Estoque Físico (Contagem)**")
+        st.write("2. Estoque Físico (Contagem)")
         st.write("Colunas: codigo, quantidade_fisica")
         arquivo_fisico = st.file_uploader(
             "Carregar planilha do estoque físico",
@@ -522,7 +480,7 @@ def exibir_sidebar_controles():
     """Exibe controles da sidebar"""
     sistema = SistemaControleEstoque()
     
-    st.sidebar.header("🔧 Controles do Sistema")
+    st.sidebar.header("Controles do Sistema")
     st.sidebar.subheader("Realizar Contagens")
     
     produtos_disponiveis = list(sistema._obter_produtos_comuns())
@@ -567,20 +525,19 @@ def exibir_sidebar_controles():
         st.session_state.contagens_ciclicas = []
         st.sidebar.success("Contagens resetadas!")
     
-    # Informações dos dados carregados
-    st.sidebar.subheader("📊 Dados Carregados")
+    st.sidebar.subheader("Dados Carregados")
     st.sidebar.write(f"Produtos sistema: {len(st.session_state.estoque_sistema)}")
     st.sidebar.write(f"Produtos físico: {len(st.session_state.estoque_fisico)}")
     st.sidebar.write(f"Produtos válidos: {len(produtos_disponiveis)}")
 
 def exibir_kpis():
-    """Exibe KPIs principais"""
+
     sistema = SistemaControleEstoque()
     metricas = sistema.calcular_acuracidade()
     acuracidade_inicial = sistema.calcular_acuracidade_inicial()
     
     if 'erro' not in metricas:
-        st.subheader("📈 KPIs Principais")
+        st.subheader("KPIs Principais")
         
         col1, col2, col3, col4 = st.columns(4)
         
@@ -611,8 +568,8 @@ def exibir_kpis():
                      delta=f"+{produtividade - 60}% vs atual")
             st.markdown('</div>', unsafe_allow_html=True)
     else:
-        # Mostrar métricas iniciais
-        st.subheader("📈 Análise Inicial dos Dados")
+ 
+        st.subheader("Análise Inicial dos Dados")
         
         produtos_divergentes = sistema.obter_produtos_divergentes()
         total_produtos = len(sistema._obter_produtos_comuns())
@@ -643,21 +600,21 @@ def exibir_kpis():
             st.markdown('</div>', unsafe_allow_html=True)
 
 def exibir_tab_divergencias():
-    """Exibe tab de análise de divergências"""
+
     st.subheader("🚨 Produtos com Divergências")
     
     sistema = SistemaControleEstoque()
     produtos_divergentes = sistema.obter_produtos_divergentes()
     
     if produtos_divergentes:
-        # Separar por tipo
+
         sobras = [p for p in produtos_divergentes if p['tipo'] == 'Sobra']
         faltas = [p for p in produtos_divergentes if p['tipo'] == 'Falta']
         
         col1, col2 = st.columns(2)
         
         with col1:
-            st.subheader("📈 Sobras no Estoque")
+            st.subheader("Sobras no Estoque")
             if sobras:
                 df_sobras = pd.DataFrame(sobras)
                 st.dataframe(
@@ -672,7 +629,7 @@ def exibir_tab_divergencias():
                 st.success("Nenhuma sobra encontrada!")
         
         with col2:
-            st.subheader("📉 Faltas no Estoque")
+            st.subheader("Faltas no Estoque")
             if faltas:
                 df_faltas = pd.DataFrame(faltas)
                 st.dataframe(
@@ -686,8 +643,7 @@ def exibir_tab_divergencias():
             else:
                 st.success("Nenhuma falta encontrada!")
         
-        # Resumo geral
-        st.subheader("📊 Resumo das Divergências")
+        st.subheader("Resumo das Divergências")
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
@@ -704,8 +660,7 @@ def exibir_tab_divergencias():
                 maior_valor = max(produtos_divergentes, key=lambda x: x['valor_divergencia'])
                 st.metric("Maior Impacto (R$)", f"R$ {maior_valor['valor_divergencia']:,.2f}")
         
-        # Top 10 divergências por valor
-        st.subheader("🔥 Top 10 Divergências por Impacto Financeiro")
+        st.subheader("Top 10 Divergências por Impacto Financeiro")
         top_10 = produtos_divergentes[:10]
         df_top10 = pd.DataFrame(top_10)
         
@@ -730,7 +685,7 @@ def exibir_tab_divergencias():
         st.plotly_chart(fig_top10, use_container_width=True)
         
     else:
-        st.info("⚠️ Carregue as planilhas para ver as divergências dos seus produtos.")
+        st.info("Carregue as planilhas para ver as divergências dos seus produtos.")
         st.write("O sistema analisará automaticamente:")
         st.write("• Produtos com sobras (quantidade física > sistema)")
         st.write("• Produtos com faltas (quantidade física < sistema)")
@@ -738,10 +693,9 @@ def exibir_tab_divergencias():
         st.write("• Ranking dos produtos com maiores divergências")
 
 def exibir_tab_dados():
-    """Exibe tab de dados detalhados"""
+
     st.subheader("Dados Detalhados")
     
-    # Mostrar resumo dos dados carregados
     st.write("**Resumo dos Dados Carregados:**")
     col1, col2 = st.columns(2)
     
@@ -760,7 +714,6 @@ def exibir_tab_dados():
             st.write("**Estoque Físico:**")
             st.dataframe(df_fisico, use_container_width=True)
     
-    # Mostrar contagens realizadas
     if st.session_state.contagens_ciclicas:
         df_contagens = pd.DataFrame(st.session_state.contagens_ciclicas)
         df_contagens['timestamp'] = pd.to_datetime(df_contagens['timestamp'])
@@ -782,19 +735,14 @@ def exibir_tab_dados():
     else:
         st.info("Realize algumas contagens para ver os dados detalhados.")
 
-# ==================== FUNÇÃO PRINCIPAL ====================
-
 def main():
     """Função principal do dashboard"""
     
-    # Header
     st.markdown('<h1 class="main-header">Sistema de Controle de Acuracidade de Estoque</h1>', 
                 unsafe_allow_html=True)
     
-    # Upload de planilhas
     exibir_upload_section()
     
-    # Verificar se os dados foram carregados
     if not st.session_state.estoque_sistema:
         st.warning("⚠️ Por favor, carregue primeiro a planilha do estoque do sistema para continuar.")
         return
@@ -803,13 +751,9 @@ def main():
         st.warning("⚠️ Por favor, carregue a planilha do estoque físico para realizar as contagens.")
         return
     
-    # Sidebar com controles
     exibir_sidebar_controles()
-    
-    # KPIs Principais
     exibir_kpis()
     
-    # Tabs com análises
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "Evolução", "Comparativo", "ROI", "Categorias", "Divergências", "Dados"
     ])
@@ -879,7 +823,6 @@ def main():
     with tab6:
         exibir_tab_dados()
     
-    # Footer
     st.markdown("---")
     st.markdown("""
     <div style='text-align: center; color: #666;'>
