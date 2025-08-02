@@ -477,7 +477,7 @@ def exibir_upload_section():
     st.markdown('</div>', unsafe_allow_html=True)
 
 def exibir_sidebar_controles():
-    """Exibe controles da sidebar"""
+
     sistema = SistemaControleEstoque()
     
     st.sidebar.header("Controles do Sistema")
@@ -494,6 +494,12 @@ def exibir_sidebar_controles():
         produtos_disponiveis,
         format_func=lambda x: f"{x} - {st.session_state.estoque_sistema[x]['nome']}"
     )
+
+    if st.sidebar.button("Reset Contagens"):
+        st.session_state.movimentacoes = []
+        st.session_state.divergencias = []
+        st.session_state.contagens_ciclicas = []
+        st.sidebar.success("Contagens resetadas!")
     
     if st.sidebar.button("Realizar Contagem"):
         with st.spinner("Realizando contagem..."):
@@ -502,28 +508,62 @@ def exibir_sidebar_controles():
             
             if 'erro' in resultado:
                 st.sidebar.error(resultado['erro'])
-            elif resultado['status'] == 'OK':
-                st.sidebar.success(f"Contagem OK: {resultado['nome']}")
             else:
-                st.sidebar.error(f"Divergência: {resultado['nome']}")
-                st.sidebar.write(f"Diferença: {resultado['divergencia']} unidades")
-                st.sidebar.write(f"Impacto: R$ {resultado['valor_divergencia']:,.2f}")
+                status_color = "success" if resultado['status'] == 'OK' else "danger"
+                st.sidebar.markdown(f'<div class="metric-card {status_color}-metric">', unsafe_allow_html=True)
+                st.sidebar.metric("Produto", f"{resultado['nome']}")
+                st.sidebar.metric("Status", resultado['status'])
+                st.sidebar.metric("Qtd. Sistema", resultado['qtd_sistema'])
+                st.sidebar.metric("Qtd. Física", resultado['qtd_fisica'])
+                st.sidebar.metric("Divergência (Unid)", resultado['divergencia'])
+                st.sidebar.metric("Impacto (R$)", f"{resultado['valor_divergencia']:,.2f}")
+                st.sidebar.markdown('</div>', unsafe_allow_html=True)
     
     if st.sidebar.button("Simular Contagens Múltiplas"):
         with st.spinner("Realizando múltiplas contagens..."):
+            resultados = []
             progress_bar = st.sidebar.progress(0)
+
             for i, codigo in enumerate(produtos_disponiveis):
                 resultado = sistema.realizar_contagem_ciclica(codigo)
                 if 'erro' not in resultado:
-                    progress_bar.progress((i + 1) / len(produtos_disponiveis))
+                    resultados.append(resultado)
+                progress_bar.progress((i + 1) / len(produtos_disponiveis))
                 time.sleep(0.2)
-            st.sidebar.success("Todas as contagens realizadas!")
-    
-    if st.sidebar.button("Reset Contagens"):
-        st.session_state.movimentacoes = []
-        st.session_state.divergencias = []
-        st.session_state.contagens_ciclicas = []
-        st.sidebar.success("Contagens resetadas!")
+
+            if resultados:
+                st.sidebar.success("Todas as contagens realizadas!")
+
+                opcao_filtro = st.sidebar.selectbox(
+                    "Filtrar produtos por status:",
+                    ["Todos", "Apenas com divergência", "Apenas sem divergência"]
+                )
+
+                if opcao_filtro == "Apenas com divergência":
+                    resultados_filtrados = [res for res in resultados if res['status'] != 'OK']
+                elif opcao_filtro == "Apenas sem divergência":
+                    resultados_filtrados = [res for res in resultados if res['status'] == 'OK']
+                else:
+                    resultados_filtrados = resultados
+
+                if resultados_filtrados:
+                    for res in resultados_filtrados:
+                        with st.sidebar.expander(f"{res['nome']} ({res['status']})", expanded=False):
+                            st.markdown("---")
+                            st.metric("Qtd. Sistema", res['qtd_sistema'])
+                            st.metric("Qtd. Física", res['qtd_fisica'])
+                            st.metric("Divergência (Unid)", res['divergencia'])
+                            st.metric("Impacto (R$)", f"{res['valor_divergencia']:,.2f}")
+                else:
+                    st.sidebar.info("Nenhum produto encontrado com esse filtro.")
+                
+                for res in resultados:
+                    with st.sidebar.expander(f"{res['nome']} ({res['status']})", expanded=False):
+                        st.markdown("---")
+                        st.metric("Qtd. Sistema", res['qtd_sistema'])
+                        st.metric("Qtd. Física", res['qtd_fisica'])
+                        st.metric("Divergência (Unid)", res['divergencia'])
+                        st.metric("Impacto (R$)", f"{res['valor_divergencia']:,.2f}")
     
     st.sidebar.subheader("Dados Carregados")
     st.sidebar.write(f"Produtos sistema: {len(st.session_state.estoque_sistema)}")
@@ -601,7 +641,7 @@ def exibir_kpis():
 
 def exibir_tab_divergencias():
 
-    st.subheader("🚨 Produtos com Divergências")
+    st.subheader("Produtos com Divergências")
     
     sistema = SistemaControleEstoque()
     produtos_divergentes = sistema.obter_produtos_divergentes()
